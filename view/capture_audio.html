@@ -1,0 +1,89 @@
+<!doctype html>
+<html>
+	<head>
+		<title>Capture Audio</title>
+		<meta charset='utf-8'>
+	</head>
+	<body>
+		<h2> Let's capture the audio from microphone in your device without additional client program </h2>
+
+		<button id="stop" onclick="handleStop" disabled>Stop</button><br />
+		<hr>
+		 <button id="record" onclick="handleRecord" disabled>Record</button>
+		<script>
+		let shouldStop = false;
+		let stopped = false;
+		const stopButton = document.getElementById('stop');
+		const recordButton = document.getElementById('record');
+		const timeSlice = 2000;
+		var mediaRecorder;
+		stopButton.disabled = false
+		var sendToServer = function(data, callback) {
+			var blobData = new Blob([data]);
+			var formData = new FormData();
+			var url = '/upload';
+			formData.append('wavData', blobData);
+			var xhr = new XMLHttpRequest();
+			xhr.open("POST", url, true);
+			xhr.enctype = "multipart/form-data";
+			xhr.onreadystatechange = function(e) {
+				if (xhr.readyState == 4) {
+					blobData = null;
+					formData = null;
+					callback();
+				}
+			}
+			xhr.send(formData);
+
+		}
+		function handleStop () {
+			mediaRecorder.onStop = () => {
+				console.log('stop')
+				recordButton.disabled = false
+				stopButton.disabled = true
+			}
+		}
+		function handleRecord () {
+			
+			recordButton.disabled = true
+			stopButton.disabled = false
+		}
+		var handleSuccess = function(stream) {  
+			const options = {mimeType: 'video/webm;codecs=vp9'};
+			mediaRecorder = new MediaRecorder(stream, options);
+
+			mediaRecorder.ondataavailable = function(e) {
+				console.log('dataavailable!');
+
+				if (mediaRecorder.state == 'recording') {
+					mediaRecorder.stop();
+					if (e.data.size > 0) {
+						sendToServer(e.data, function() {
+							console.log('Upload request!');
+						})
+					}
+				}
+			};
+
+			mediaRecorder.onerror = function(e) {
+				console.log('error occured on recorder', e);
+			}
+			mediaRecorder.onresume = function() {
+				console.log('onresume');
+			}
+			mediaRecorder.onstart = function() {
+				console.log('onstart');
+
+			}
+			mediaRecorder.onstop = function() {
+				console.log('onstop');
+				mediaRecorder.start(timeSlice);
+			}
+
+			mediaRecorder.start(timeSlice);
+		};
+		navigator.mediaDevices.getUserMedia({ audio: true, video: false })
+			.then(handleSuccess);
+		</script>
+	</body>
+</html>
